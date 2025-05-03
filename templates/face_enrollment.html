@@ -1,0 +1,546 @@
+{% extends "layout.html" %}
+
+{% block title %}Face Enrollment{% endblock %}
+
+{% block content %}
+    <h2>Face Enrollment</h2>
+
+    <div class="card">
+        <h3>Enroll New Face</h3>
+        <form action="{{ url_for('face_enrollment') }}" method="POST" enctype="multipart/form-data" id="enrollmentForm">
+            <div class="form-group">
+                <label for="student_id">Student</label>
+                <select id="student_id" name="student_id" required>
+                    <option value="">Select a student</option>
+                    {% for student in students %}
+                        <option value="{{ student.student_id }}">{{ student.name }} ({{ student.student_id }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Capture Method</label>
+                <div class="capture-method-options">
+                    <label class="radio-option">
+                        <input type="radio" id="method_webcam" name="capture_method" value="webcam" checked>
+                        <span>Use Webcam</span>
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" id="method_upload" name="capture_method" value="upload">
+                        <span>Upload Photo</span>
+                    </label>
+                </div>
+            </div>
+
+            <div id="webcamSection">
+                <div class="webcam-container">
+                    <video id="enrollmentWebcam" width="640" height="480" autoplay muted playsinline></video>
+                    <div class="webcam-overlay" id="webcamOverlay"></div>
+                </div>
+                <div class="webcam-controls">
+                    <button type="button" id="enrollmentCaptureBtn" class="btn btn-primary">
+                        <i class="fas fa-camera"></i> Capture
+                    </button>
+                    <button type="button" id="retryCaptureBtn" class="btn btn-secondary" style="display: none;">
+                        <i class="fas fa-redo"></i> Retry
+                    </button>
+                </div>
+                <canvas id="enrollmentCanvas" style="display: none;"></canvas>
+                <input type="hidden" id="webcamImage" name="webcamImage">
+                <div id="webcamStatus" class="status-message"></div>
+            </div>
+
+            <div id="uploadSection" style="display: none;">
+                <div class="form-group file-upload">
+                    <label for="photo" class="upload-label">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <span>Choose a photo or drag it here</span>
+                        <input type="file" id="photo" name="photo" accept="image/*" onchange="validateFile(this)">
+                    </label>
+                    <div id="fileName" class="file-info"></div>
+                    <div id="uploadStatus" class="status-message"></div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <button type="submit" id="submitBtn" class="btn btn-success" disabled>
+                    <i class="fas fa-user-plus"></i> Enroll Face
+                </button>
+            </div>
+        </form>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            // DOM Elements
+            const webcamSection = document.getElementById('webcamSection');
+            const uploadSection = document.getElementById('uploadSection');
+            const webcamRadio = document.getElementById('method_webcam');
+            const uploadRadio = document.getElementById('method_upload');
+            const form = document.getElementById('enrollmentForm');
+            const photoInput = document.getElementById('photo');
+            const fileNameDisplay = document.getElementById('fileName');
+            const webcamStatus = document.getElementById('webcamStatus');
+            const uploadStatus = document.getElementById('uploadStatus');
+            const submitBtn = document.getElementById('submitBtn');
+            const retryBtn = document.getElementById('retryCaptureBtn');
+
+            // Webcam elements
+            const video = document.getElementById('enrollmentWebcam');
+            const captureBtn = document.getElementById('enrollmentCaptureBtn');
+            const canvas = document.getElementById('enrollmentCanvas');
+            const webcamImage = document.getElementById('webcamImage');
+            const webcamOverlay = document.getElementById('webcamOverlay');
+            const ctx = canvas.getContext('2d');
+            let stream = null;
+            let isImageCaptured = false;
+
+            // Initialize based on default selection
+            function initializeCaptureMethod() {
+                if (uploadRadio.checked) {
+                    webcamSection.style.display = 'none';
+                    uploadSection.style.display = 'block';
+                    photoInput.setAttribute('required', '');
+                    checkSubmitConditions();
+                } else {
+                    webcamSection.style.display = 'block';
+                    uploadSection.style.display = 'none';
+                    photoInput.removeAttribute('required');
+                    startWebcam();
+                }
+            }
+
+            // Toggle between webcam and upload
+            webcamRadio.addEventListener('change', function() {
+                if (this.checked) {
+                    uploadSection.style.display = 'none';
+                    webcamSection.style.display = 'block';
+                    photoInput.removeAttribute('required');
+                    fileNameDisplay.textContent = '';
+                    uploadStatus.textContent = '';
+                    startWebcam();
+                    checkSubmitConditions();
+                }
+            });
+
+            uploadRadio.addEventListener('change', function() {
+                if (this.checked) {
+                    webcamSection.style.display = 'none';
+                    uploadSection.style.display = 'block';
+                    photoInput.setAttribute('required', '');
+                    stopWebcam();
+                    checkSubmitConditions();
+                }
+            });
+
+            // File validation
+            function validateFile(input) {
+                const maxSize = 5 * 1024 * 1024; // 5MB
+                if (input.files && input.files[0]) {
+                    const file = input.files[0];
+
+                    if (!file.type.match('image.*')) {
+                        showError("Please select an image file (JPEG, PNG)", uploadStatus);
+                        input.value = '';
+                        submitBtn.disabled = true;
+                        return;
+                    }
+
+                    if (file.size > maxSize) {
+                        showError("File too large (max 5MB)", uploadStatus);
+                        input.value = '';
+                        submitBtn.disabled = true;
+                        return;
+                    }
+
+                    fileNameDisplay.textContent = `Selected: ${file.name} (${(file.size/1024).toFixed(1)}KB)`;
+                    showSuccess("Ready to enroll", uploadStatus);
+                    checkSubmitConditions();
+                } else {
+                    fileNameDisplay.textContent = '';
+                    uploadStatus.textContent = '';
+                    checkSubmitConditions();
+                }
+            }
+
+            // Drag and drop for file upload
+            const uploadLabel = document.querySelector('.upload-label');
+            uploadLabel.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadLabel.classList.add('dragover');
+            });
+
+            uploadLabel.addEventListener('dragleave', () => {
+                uploadLabel.classList.remove('dragover');
+            });
+
+            uploadLabel.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadLabel.classList.remove('dragover');
+                if (e.dataTransfer.files.length) {
+                    photoInput.files = e.dataTransfer.files;
+                    validateFile(photoInput);
+                }
+            });
+
+            // Webcam functions
+            async function startWebcam() {
+                try {
+                    stopWebcam();
+                    showInfo("Initializing webcam...", webcamStatus);
+
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            width: { ideal: 640 },
+                            height: { ideal: 480 },
+                            facingMode: 'user'
+                        },
+                        audio: false
+                    });
+
+                    video.srcObject = stream;
+                    video.style.display = 'block';
+                    captureBtn.style.display = 'block';
+                    retryBtn.style.display = 'none';
+                    webcamOverlay.style.display = 'none';
+                    showInfo("Webcam ready - Smile and click Capture!", webcamStatus);
+                    isImageCaptured = false;
+                    checkSubmitConditions();
+                } catch (err) {
+                    console.error("Webcam error:", err);
+                    showError("Error: Could not access webcam", webcamStatus);
+
+                    // Fallback to upload
+                    webcamRadio.checked = false;
+                    uploadRadio.checked = true;
+                    initializeCaptureMethod();
+                }
+            }
+
+            function stopWebcam() {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    stream = null;
+                }
+                video.srcObject = null;
+            }
+
+            function captureFrame() {
+                if (!stream) return;
+
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // Convert to base64 and store in hidden input
+                webcamImage.value = canvas.toDataURL('image/jpeg', 0.9);
+                isImageCaptured = true;
+
+                // Show preview
+                webcamOverlay.style.display = 'block';
+                webcamOverlay.style.backgroundImage = `url(${webcamImage.value})`;
+                video.style.display = 'none';
+                captureBtn.style.display = 'none';
+                retryBtn.style.display = 'block';
+                showSuccess("Photo captured! Review and submit or retry.", webcamStatus);
+                checkSubmitConditions();
+            }
+
+            // Retry capture
+            retryBtn.addEventListener('click', function() {
+                webcamImage.value = '';
+                isImageCaptured = false;
+                webcamOverlay.style.display = 'none';
+                video.style.display = 'block';
+                captureBtn.style.display = 'block';
+                retryBtn.style.display = 'none';
+                showInfo("Webcam ready - Smile and click Capture!", webcamStatus);
+                checkSubmitConditions();
+            });
+
+            // Check if form can be submitted
+            function checkSubmitConditions() {
+                const studentSelected = document.getElementById('student_id').value !== '';
+
+                if (webcamRadio.checked) {
+                    submitBtn.disabled = !(studentSelected && isImageCaptured);
+                } else {
+                    submitBtn.disabled = !(studentSelected && photoInput.files.length > 0);
+                }
+            }
+
+            // Form submission handler
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+
+                const studentId = document.getElementById('student_id').value;
+                const statusElement = webcamRadio.checked ? webcamStatus : uploadStatus;
+
+                // Validate inputs
+                if (!studentId) {
+                    showError("Please select a student first!", statusElement);
+                    return;
+                }
+
+                if (webcamRadio.checked && !isImageCaptured) {
+                    showError("Please capture an image first!", statusElement);
+                    return;
+                }
+
+                if (uploadRadio.checked && (!photoInput.files || photoInput.files.length === 0)) {
+                    showError("Please select a photo first!", statusElement);
+                    return;
+                }
+
+                // Disable button and show loading state
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+
+                try {
+                    // Prepare form data
+                    const formData = new FormData();
+                    formData.append('student_id', studentId);
+                    formData.append('capture_method', webcamRadio.checked ? 'webcam' : 'upload');
+
+                    // Handle webcam image conversion
+                    if (webcamRadio.checked && isImageCaptured) {
+                        // Convert base64 to blob more reliably
+                        const base64Data = webcamImage.value.split(',')[1];
+                        const byteCharacters = atob(base64Data);
+                        const byteArrays = [];
+
+                        for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+                            const slice = byteCharacters.slice(offset, offset + 512);
+                            const byteNumbers = new Array(slice.length);
+
+                            for (let i = 0; i < slice.length; i++) {
+                                byteNumbers[i] = slice.charCodeAt(i);
+                            }
+
+                            const byteArray = new Uint8Array(byteNumbers);
+                            byteArrays.push(byteArray);
+                        }
+
+                        const blob = new Blob(byteArrays, {type: 'image/jpeg'});
+                        formData.append('webcamImage', blob, `capture_${studentId}.jpg`);
+                    } else if (uploadRadio.checked) {
+                        formData.append('photo', photoInput.files[0]);
+                    }
+
+                    // Submit the form
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    // Handle response
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        showSuccess(result.message || "Face enrolled successfully!", statusElement);
+                        // Reset form
+                        if (webcamRadio.checked) {
+                            retryBtn.click();
+                        } else {
+                            photoInput.value = '';
+                            fileNameDisplay.textContent = '';
+                        }
+                    } else {
+                        showError(result.message || "Enrollment failed. Please try again.", statusElement);
+                    }
+                } catch (error) {
+                    console.error("Submission error:", error);
+                    showError("An error occurred: " + (error.message || "Please try again"), statusElement);
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Enroll Face';
+                }
+            });
+
+            // Helper functions for status messages
+            function showError(message, element) {
+                element.textContent = message;
+                element.className = "status-message error";
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            function showSuccess(message, element) {
+                element.textContent = message;
+                element.className = "status-message success";
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // Clear success message after 3 seconds
+                setTimeout(() => {
+                    if (element.textContent === message) {
+                        element.textContent = '';
+                        element.className = "status-message";
+                    }
+                }, 3000);
+            }
+
+            function showInfo(message, element) {
+                element.textContent = message;
+                element.className = "status-message info";
+            }
+
+            // Student selection change
+            document.getElementById('student_id').addEventListener('change', checkSubmitConditions);
+
+            // Initialize
+            initializeCaptureMethod();
+            captureBtn.addEventListener('click', captureFrame);
+        });
+    </script>
+{% endblock %}
+
+{% block styles %}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        .capture-method-options {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .radio-option:hover {
+            background-color: #f0f0f0;
+        }
+
+        .radio-option input {
+            margin-right: 8px;
+        }
+
+        .webcam-container {
+            position: relative;
+            width: 640px;
+            height: 480px;
+            margin: 15px 0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .webcam-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            display: none;
+        }
+
+        .webcam-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .file-upload {
+            margin: 20px 0;
+        }
+
+        .upload-label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .upload-label:hover, .upload-label.dragover {
+            border-color: #4CAF50;
+            background-color: #f8fff8;
+        }
+
+        .upload-label i {
+            font-size: 48px;
+            color: #4CAF50;
+            margin-bottom: 10px;
+        }
+
+        .file-info {
+            margin-top: 10px;
+            padding: 8px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .status-message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .status-message.info {
+            background-color: #e7f3fe;
+            color: #0c5460;
+            border-left: 4px solid #17a2b8;
+        }
+
+        .status-message.success {
+            background-color: #e8f5e9;
+            color: #155724;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .status-message.error {
+            background-color: #ffebee;
+            color: #721c24;
+            border-left: 4px solid #f44336;
+        }
+
+        #submitBtn {
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        #submitBtn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .fa-spinner {
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #submitBtn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        #submitBtn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+    </style>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+
+{% block title %}System Settings{% endblock %}
+
+{% block content %}
+    <h2>System Settings</h2>
+    
+    <div class="card">
+        <h3>Face Recognition Settings</h3>
+        <form action="{{ url_for('settings') }}" method="POST">
+            <div class="form-group">
+                <label for="min_confidence">Minimum Confidence Threshold</label>
+                <input type="number" id="min_confidence" name="min_confidence" 
+                       min="0.1" max="0.99" step="0.01" 
+                       value="{{ min_confidence }}" required>
+                <small>The higher the value, the more strict the face recognition will be (0.1-0.99)</small>
+            </div>
+            
+            <div class="form-group">
+                <input type="submit" value="Save Settings" class="btn">
+            </div>
+        </form>
+    </div>
+    
+    <div class="card">
+        <h3>Attendance Settings</h3>
+        <form>
+            <div class="form-group">
+                <label for="late_threshold">Late Threshold (minutes)</label>
+                <input type="number" id="late_threshold" name="late_threshold" value="15">
+                <small>Students arriving after this time will be marked as late</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="cutoff_time">Daily Cutoff Time</label>
+                <input type="time" id="cutoff_time" name="cutoff_time" value="23:59">
+                <small>Time when the system considers the attendance day to end</small>
+            </div>
+            
+            <div class="form-group">
+                <input type="submit" value="Save Settings" class="btn">
+            </div>
+        </form>
+    </div>
+{% endblock %}

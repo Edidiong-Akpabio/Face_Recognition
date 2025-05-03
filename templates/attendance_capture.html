@@ -1,0 +1,362 @@
+{% extends "layout.html" %}
+
+{% block title %}Attendance Capture{% endblock %}
+
+{% block content %}
+    <h2>Attendance Capture</h2>
+    
+    <div class="card">
+        <h3>Real-time Attendance</h3>
+
+        <div class="webcam-container">
+            <video id="webcam" width="640" height="480" autoplay></video>
+            <canvas id="canvas" style="display: none;"></canvas>
+        </div>
+
+        <div class="capture-controls">
+            <button id="captureBtn" class="btn btn-primary">
+                <i class="fas fa-camera"></i> Capture Attendance
+            </button>
+            <div id="loadingSpinner" class="spinner-border text-primary" role="status" style="display: none;">
+                <span class="sr-only">Processing...</span>
+            </div>
+        </div>
+
+        <div id="recognitionResult" class="result-container"></div>
+
+        <div class="detection-tips">
+            <h4><i class="fas fa-lightbulb"></i> Tips for better recognition:</h4>
+            <ul>
+                <li>Ensure good lighting on your face</li>
+                <li>Face the camera directly</li>
+                <li>Remove sunglasses or hats</li>
+                <li>Stand about 1-2 meters from the camera</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Recent Attendance</h3>
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>Student ID</th>
+                        <th>Name</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in recent_attendance %}
+                        <tr>
+                            <td>{{ record.student.student_id }}</td>
+                            <td>{{ record.student.name }}</td>
+                            <td>{{ record.entry_time.strftime('%H:%M:%S') }}</td>
+                            <td>
+                                <span class="badge badge-{{ 'success' if record.status == 'Present' else 'warning' }}">
+                                    {{ record.status }}
+                                </span>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center">No attendance records today</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <style>
+        .webcam-container {
+            position: relative;
+            margin-bottom: 20px;
+            border: 3px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .capture-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .result-container {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            min-height: 100px;
+        }
+
+        .result-message {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .info-message {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .success-message {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .detection-tips {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e2f3f8;
+            border-radius: 4px;
+            border-left: 4px solid #17a2b8;
+        }
+
+        .detection-tips ul {
+            margin-bottom: 0;
+        }
+
+        .face-box {
+            position: absolute;
+            border: 2px solid #0d6efd;
+            background-color: rgba(13, 110, 253, 0.2);
+        }
+
+        .face-label {
+            position: absolute;
+            background-color: #0d6efd;
+            color: white;
+            padding: 2px 5px;
+            font-size: 12px;
+            border-radius: 3px;
+        }
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const video = document.getElementById('webcam');
+            const canvas = document.getElementById('canvas');
+            const captureBtn = document.getElementById('captureBtn');
+            const resultDiv = document.getElementById('recognitionResult');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+
+            let stream = null;
+            let faceBoxes = [];
+
+            // Start webcam
+            async function startWebcam() {
+                try {
+                    resultDiv.innerHTML = '<div class="result-message info-message">Initializing camera...</div>';
+
+                    const constraints = {
+                        video: {
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 },
+                            facingMode: 'user'
+                        }
+                    };
+
+                    stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    video.srcObject = stream;
+
+                    // Remove initialization message after successful start
+                    setTimeout(() => {
+                        if (resultDiv.querySelector('.info-message')) {
+                            resultDiv.querySelector('.info-message').remove();
+                        }
+                    }, 2000);
+
+                } catch (err) {
+                    console.error("Error accessing webcam:", err);
+                    showError("Could not access webcam. Please ensure permissions are granted.");
+                }
+            }
+
+            // Show error message
+            function showError(message) {
+                resultDiv.innerHTML = `
+                    <div class="result-message error-message">
+                        <i class="fas fa-exclamation-circle"></i> ${message}
+                    </div>
+                `;
+            }
+
+            // Show info message
+            function showInfo(message) {
+                resultDiv.innerHTML = `
+                    <div class="result-message info-message">
+                        <i class="fas fa-info-circle"></i> ${message}
+                    </div>
+                `;
+            }
+
+            // Show success message
+            function showSuccess(message) {
+                resultDiv.innerHTML = `
+                    <div class="result-message success-message">
+                        <i class="fas fa-check-circle"></i> ${message}
+                    </div>
+                `;
+            }
+
+            // Clear face boxes from video
+            function clearFaceBoxes() {
+                faceBoxes.forEach(box => {
+                    if (box.parentNode) {
+                        box.parentNode.removeChild(box);
+                    }
+                });
+                faceBoxes = [];
+            }
+
+            // Draw face boxes on video
+            function drawFaceBoxes(locations, names) {
+                clearFaceBoxes();
+
+                const videoRect = video.getBoundingClientRect();
+                const scaleX = videoRect.width / video.videoWidth;
+                const scaleY = videoRect.height / video.videoHeight;
+
+                locations.forEach((location, index) => {
+                    const [y1, y2, x1, x2] = location;
+
+                    // Create face box
+                    const box = document.createElement('div');
+                    box.className = 'face-box';
+                    box.style.left = `${x1 * scaleX}px`;
+                    box.style.top = `${y1 * scaleY}px`;
+                    box.style.width = `${(x2 - x1) * scaleX}px`;
+                    box.style.height = `${(y2 - y1) * scaleY}px`;
+
+                    // Create label
+                    const label = document.createElement('div');
+                    label.className = 'face-label';
+                    label.textContent = names[index] === "Unknown" ? "Unknown" : names[index];
+                    label.style.left = `${x1 * scaleX}px`;
+                    label.style.top = `${(y1 * scaleY) - 20}px`;
+
+                    video.parentNode.appendChild(box);
+                    video.parentNode.appendChild(label);
+
+                    faceBoxes.push(box, label);
+                });
+            }
+
+async function captureFrame() {
+    try {
+        // Show loading state
+        captureBtn.disabled = true;
+        loadingSpinner.style.display = 'inline-block';
+        resultDiv.innerHTML = '<div class="result-message info-message">Processing image...</div>';
+
+        const response = await fetch('{{ url_for("attendance_capture") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({})
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.details || data.message || 'Request failed');
+        }
+
+        displayResults(data);
+    } catch (err) {
+        console.error("Error:", err);
+        showError(err.message || "Failed to process image");
+    } finally {
+        captureBtn.disabled = false;
+        loadingSpinner.style.display = 'none';
+    }
+}
+            // Display recognition results
+            function displayResults(data) {
+                resultDiv.innerHTML = '';
+
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+
+                if (!data.recognized_names || data.recognized_names.length === 0) {
+                    showInfo("No faces detected. Please try again.");
+                    return;
+                }
+
+                // Draw face boxes on the video
+                if (data.face_locations && data.face_locations.length > 0) {
+                    drawFaceBoxes(data.face_locations, data.recognized_names);
+                }
+
+                // Create results list
+                const list = document.createElement('ul');
+                list.className = 'list-group';
+
+                data.recognized_names.forEach((name, index) => {
+                    const item = document.createElement('li');
+                    item.className = 'list-group-item';
+
+                    if (name === "Unknown") {
+                        item.innerHTML = `
+                            <i class="fas fa-question-circle text-warning"></i>
+                            Unknown person detected
+                        `;
+                    } else {
+                        const attendanceStatus = data.attendance_data && data.attendance_data[index] ?
+                            data.attendance_data[index].status : 'Recorded';
+
+                        item.innerHTML = `
+                            <i class="fas fa-check-circle text-success"></i>
+                            Recognized: <strong>${name}</strong>
+                            (Status: ${attendanceStatus})
+                        `;
+                    }
+
+                    list.appendChild(item);
+                });
+
+                resultDiv.appendChild(list);
+
+                // Show success message if any recognized
+                if (data.recognized_names.some(name => name !== "Unknown")) {
+                    showSuccess("Attendance recorded successfully!");
+                }
+
+                // Refresh recent attendance list after 2 seconds
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            }
+
+            // Initialize
+            startWebcam();
+            captureBtn.addEventListener('click', captureFrame);
+
+            // Clean up on page leave
+            window.addEventListener('beforeunload', () => {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+            });
+        });
+    </script>
+{% endblock %}

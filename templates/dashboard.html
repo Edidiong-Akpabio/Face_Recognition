@@ -1,0 +1,77 @@
+{% extends "layout.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+    <h2>Dashboard</h2>
+    
+    <div class="card-row">
+        <div class="card">
+            <h3>Total Students</h3>
+            <p class="big-number">{{ total_students }}</p>
+        </div>
+        
+        <div class="card">
+            <h3>Today's Attendance</h3>
+            <p class="big-number">{{ today_attendance }}</p>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h3>Quick Actions</h3>
+        <div class="action-buttons">
+            <a href="{{ url_for('student_management') }}" class="btn">Manage Students</a>
+            <a href="{{ url_for('face_enrollment') }}" class="btn">Enroll Faces</a>
+            <a href="{{ url_for('attendance_capture') }}" class="btn">Capture Attendance</a>
+            <a href="{{ url_for('attendance_report') }}" class="btn">View Reports</a>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h3>Recent Activity</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in recent_logs %}
+                    <tr>
+                        <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ log.action }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <style>
+        .card-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card-row .card {
+            flex: 1;
+        }
+        
+        .big-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 0;
+            text-align: center;
+            color: #2c3e50;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+    </style>
+{% endblock %}

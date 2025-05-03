@@ -1,0 +1,49 @@
+{% extends "layout.html" %}
+
+{% block title %}System Logs{% endblock %}
+
+{% block content %}
+    <h2>System Logs & History</h2>
+    
+    <div class="card">
+        <h3>Activity Logs</h3>
+        
+        <div class="filter-options">
+            <form method="GET" action="{{ url_for('logs') }}">
+                <div class="form-group">
+                    <label for="action">Filter by Action</label>
+                    <input type="text" id="action" name="action" placeholder="Search actions..." value="{{ request.args.get('action', '') }}">
+                </div>
+                
+                <div class="form-group">
+                    <input type="submit" value="Filter" class="btn">
+                </div>
+            </form>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Admin</th>
+                    <th>Action</th>
+                    <th>IP Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                    <tr>
+                        <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td>{{ log.admin.username if log.admin else 'System' }}</td>
+                        <td>{{ log.action }}</td>
+                        <td>{{ log.ip_address }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="4">No logs found</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

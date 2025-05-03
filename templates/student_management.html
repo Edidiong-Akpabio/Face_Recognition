@@ -1,0 +1,72 @@
+{% extends "layout.html" %}
+
+{% block title %}Student Management{% endblock %}
+
+{% block content %}
+    <h2>Student Management</h2>
+    
+    <div class="card">
+        <h3>Add/Edit Student</h3>
+        <form action="{{ url_for('student_management') }}" method="POST">
+            <div class="form-group">
+                <label for="student_id">Student ID</label>
+                <input type="text" id="student_id" name="student_id" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" name="name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="class">Class</label>
+                <input type="text" id="class" name="class" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="section">Section</label>
+                <input type="text" id="section" name="section" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="roll_number">Roll Number</label>
+                <input type="number" id="roll_number" name="roll_number" required>
+            </div>
+            
+            <div class="form-group">
+                <input type="submit" value="Save" class="btn">
+            </div>
+        </form>
+    </div>
+    
+    <div class="card">
+        <h3>Student List</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Student ID</th>
+                    <th>Name</th>
+                    <th>Class</th>
+                    <th>Section</th>
+                    <th>Roll No.</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                    <tr>
+                        <td>{{ student.student_id }}</td>
+                        <td>{{ student.name }}</td>
+                        <td>{{ student.class_name }}</td>
+                        <td>{{ student.section }}</td>
+                        <td>{{ student.roll_number }}</td>
+                        <td>
+                            <a href="#" class="btn btn-secondary">Edit</a>
+                            <a href="#" class="btn btn-secondary">Delete</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

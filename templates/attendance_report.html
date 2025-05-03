@@ -1,0 +1,99 @@
+{% extends "layout.html" %}
+
+{% block title %}Attendance Reports{% endblock %}
+
+{% block content %}
+    <h2>Attendance Reports</h2>
+    
+    <div class="card">
+        <h3>Filter Reports</h3>
+        <form method="GET" action="{{ url_for('attendance_report') }}">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="student_id">Student ID</label>
+                    <input type="text" id="student_id" name="student_id" value="{{ request.args.get('student_id', '') }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="class">Class</label>
+                    <input type="text" id="class" name="class" value="{{ request.args.get('class', '') }}">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="start_date">Start Date</label>
+                    <input type="date" id="start_date" name="start_date" value="{{ request.args.get('start_date', '') }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="end_date">End Date</label>
+                    <input type="date" id="end_date" name="end_date" value="{{ request.args.get('end_date', '') }}">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <input type="submit" value="Apply Filters" class="btn">
+                <a href="{{ url_for('attendance_report') }}" class="btn btn-secondary">Reset</a>
+            </div>
+        </form>
+    </div>
+    
+    <div class="card">
+        <h3>Attendance Records</h3>
+        
+        <div class="export-options">
+            <a href="#" class="btn btn-secondary">Export to CSV</a>
+            <a href="#" class="btn btn-secondary">Export to PDF</a>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Student ID</th>
+                    <th>Name</th>
+                    <th>Class</th>
+                    <th>Entry Time</th>
+                    <th>Exit Time</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for attendance, student in records %}
+                    <tr>
+                        <td>{{ attendance.date.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ student.student_id }}</td>
+                        <td>{{ student.name }}</td>
+                        <td>{{ student.class_name }}</td>
+                        <td>{{ attendance.entry_time.strftime('%H:%M:%S') if attendance.entry_time else '-' }}</td>
+                        <td>{{ attendance.exit_time.strftime('%H:%M:%S') if attendance.exit_time else '-' }}</td>
+                        <td>{{ attendance.status }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="7">No records found</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <style>
+        .form-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .form-row .form-group {
+            flex: 1;
+        }
+        
+        .export-options {
+            margin-bottom: 15px;
+        }
+    </style>
+{% endblock %}

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Attendance System - {% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Face Recognition Attendance System</h1>
+            <nav>
+                {% if 'admin_id' in session %}
+                    <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                    <a href="{{ url_for('student_management') }}">Students</a>
+                    <a href="{{ url_for('attendance_capture') }}">Attendance</a>
+                    <a href="{{ url_for('attendance_report') }}">Reports</a>
+                    <a href="{{ url_for('logs') }}">Logs</a>
+                    <a href="{{ url_for('profile') }}">Profile</a>
+                    <a href="{{ url_for('logout') }}">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}">Login</a>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2023 Face Recognition Attendance System</p>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

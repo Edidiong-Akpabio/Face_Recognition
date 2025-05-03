@@ -1,0 +1,70 @@
+{% extends "layout.html" %}
+
+{% block title %}Backup & Restore{% endblock %}
+
+{% block content %}
+    <h2>Backup & Restore</h2>
+    
+    <div class="card">
+        <h3>Create Backup</h3>
+        <form action="{{ url_for('backup') }}" method="POST">
+            <div class="form-group">
+                <label for="backup_name">Backup Name</label>
+                <input type="text" id="backup_name" name="backup_name" placeholder="e.g., backup_2023" required>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="include_faces" checked> Include face data
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <input type="submit" name="action" value="Create Backup" class="btn">
+            </div>
+        </form>
+    </div>
+    
+    <div class="card">
+        <h3>Restore Backup</h3>
+        <form action="{{ url_for('backup') }}" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="backup_file">Select Backup File</label>
+                <input type="file" id="backup_file" name="backup_file" required>
+            </div>
+            
+            <div class="form-group">
+                <input type="submit" name="action" value="Restore Backup" class="btn">
+            </div>
+        </form>
+    </div>
+    
+    <div class="card">
+        <h3>Backup Schedule</h3>
+        <form action="{{ url_for('backup') }}" method="POST">
+            <div class="form-group">
+                <label for="schedule_frequency">Frequency</label>
+                <select id="schedule_frequency" name="schedule_frequency">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="schedule_time">Time</label>
+                <input type="time" id="schedule_time" name="schedule_time" value="02:00">
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="schedule_enabled"> Enable automatic backups
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <input type="submit" name="action" value="Save Schedule" class="btn">
+            </div>
+        </form>
+    </div>
+{% endblock %}
